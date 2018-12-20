@@ -1,0 +1,11 @@
+{
+	"name": "DPI",
+	"id": 20000,
+	"commands": [
+		{
+			"theme": "DPI",
+			"syntax": "Get system DPI(&L):L",
+			"threadSafe": true
+		}
+	]
+}
