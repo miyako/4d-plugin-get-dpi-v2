@@ -3,9 +3,11 @@ Get system DPI on Windows
 
 Must read 
 
-https://docs.microsoft.com/ja-jp/windows/desktop/hidpi/high-dpi-desktop-application-development-on-windows
+https://docs.microsoft.com/en-us/windows/desktop/hidpi/high-dpi-desktop-application-development-on-windows
 
-You must restart 4D if DPI was changed during session.
+* Windows 10 only
+
+* You must restart 4D if DPI was changed during session.
 
 ### Examples
 
