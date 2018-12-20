@@ -5,6 +5,8 @@ Must read
 
 https://docs.microsoft.com/en-us/windows/desktop/hidpi/high-dpi-desktop-application-development-on-windows
 
+https://docs.microsoft.com/en-us/windows/desktop/hidpi/wm-dpichanged
+
 * Windows 10 only
 
 * You must restart 4D if DPI was changed during session.
