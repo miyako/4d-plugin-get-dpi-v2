@@ -48,6 +48,7 @@ void CommandDispatcher (PA_long32 pProcNum, sLONG_PTR *pResult, PackagePtr pPara
 
 #if VERSIONWIN
 #include <versionhelpers.h>
+#include <cmath>
 #endif
 
 void Get_system_DPI(sLONG_PTR *pResult, PackagePtr pParams)
@@ -57,13 +58,22 @@ void Get_system_DPI(sLONG_PTR *pResult, PackagePtr pParams)
 
 	Param1.fromParamAtIndex(pParams, 1);
 
+	// Explicit "unsupported" sentinel. Without this, macOS builds (VERSIONWIN
+	// compiled out entirely) and Windows 7/8 (IsWindows10OrGreater() false)
+	// would return whatever value C_LONGINT's default constructor happens to
+	// produce, with no way for the caller to detect the command didn't run.
+	returnValue.setIntValue(-1);
+
 #if VERSIONWIN
     if (IsWindows10OrGreater())
     {
         DPI_AWARENESS_CONTEXT ctx = GetThreadDpiAwarenessContext();
         SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
         UINT dpi = GetDpiForSystem();
-        SetThreadDpiAwarenessContext(ctx);
+        if (ctx != NULL)
+        {
+            SetThreadDpiAwarenessContext(ctx);
+        }
         
         switch (Param1.getIntValue())
         {
@@ -72,7 +82,7 @@ void Get_system_DPI(sLONG_PTR *pResult, PackagePtr pParams)
                 break;
             case DPI_RATIO:
             default:
-                returnValue.setIntValue(((double)dpi / USER_DEFAULT_SCREEN_DPI) * 100);
+                returnValue.setIntValue((PA_long32)std::lround(((double)dpi / USER_DEFAULT_SCREEN_DPI) * 100));
                 break;
         }
     }
