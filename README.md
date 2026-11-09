@@ -8,6 +8,52 @@ This plugin exposes a single command, `Get system DPI`, that reads the current W
 
 **Platforms:** Windows 10 (version 1607, the Anniversary Update) or later only.
 
+## Maintainer workflows
+
+**Bump version** is manual: select a branch and patch/minor/major. It validates
+source metadata, commits coordinated `MARKETING_VERSION` and
+`CURRENT_PROJECT_VERSION` settings and literal source plist version fields, then
+pushes only that selected branch without force or follow-tags. It rejects a
+branch that moved since dispatch; dispatch again from its new tip. No tag,
+release, or automatic Build is created.
+
+**Build** is a separate manual workflow with no typed inputs: use the branch
+selector. Every checkout uses the immutable selected `github.sha`, not a moving
+branch or tag. Strict source `X.Y.Z` determines the `vX.Y.Z` release tag.
+All Xcode version settings and source `Info.plist` version fields must agree;
+recognized `$(MARKETING_VERSION)`, `${MARKETING_VERSION}`,
+`$(CURRENT_PROJECT_VERSION)`, and `${CURRENT_PROJECT_VERSION}` plist references
+are preserved. Optional absent plist build versions remain absent. The
+authoritative version is the marketing/source plist version (currently `1.0.2`);
+the old bump contract coordinated current-project versions too, so its stale
+`1.0.0` values were repaired without incrementing the release version.
+Prebuilt bundles, dependencies, and 4D schema metadata are not version sources.
+
+Build retains Windows x64, then universal macOS (arm64 + x86_64), the merged
+cross-platform bundle, Developer ID signing, notarization, and the
+`DPI-X.Y.Z.zip` / `DPI-X.Y.Z.dmg` assets. The command itself is still Windows-only.
+Existing signing/notary secret names are unchanged.
+
+Publication is serialized repository-wide across branches. Both before builds
+and after all build/sign/notary gates, it checks remote tags and every page of
+the authenticated releases list, including drafts. Any existing matching tag or
+draft/published release blocks publication; API/auth/network/malformed-response
+errors fail closed. It nonforce-creates a tag at exactly the selected SHA,
+requires a newly-created result (even a same-SHA race fails), verifies the remote
+target, then uses a create-only REST release POST with explicit tag, target,
+name, `draft=false`, and `prerelease=false`. As before, release notes are empty,
+not auto-generated. Assets are POSTed to the returned new release ID without
+overwriting.
+
+**Manual recovery:** tag, release creation, or upload failures retain partial
+remote state. There is no automatic delete, update, rollback, or retry. Inspect
+the tag target, release (including drafts), and uploaded assets manually before
+deciding how to recover. Rerunning the same version is blocked by any retained
+tag/release; do not blindly retry or overwrite an existing publication.
+
+Local lifecycle regressions: `python3 -m unittest discover -s .github/tests -v`.
+Workflow lint: `actionlint`. These checks do not run native builds or publish.
+
 ---
 
 ## Requirements & platform notes

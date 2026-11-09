@@ -1,2 +1,3 @@
 build/*
 DPI.4dbase/userPreferences.*
+__pycache__/
