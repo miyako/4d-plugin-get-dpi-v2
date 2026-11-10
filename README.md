@@ -54,6 +54,87 @@ tag/release; do not blindly retry or overwrite an existing publication.
 Local lifecycle regressions: `python3 -m unittest discover -s .github/tests -v`.
 Workflow lint: `actionlint`. These checks do not run native builds or publish.
 
+## Native ownership regression
+
+Run `python3 tests/native/run.py --baseline` on macOS with Xcode command-line
+tools. The unsigned **Native ownership** pull-request check runs the same command.
+It directly compiles the complete unchanged bundled `4DPluginAPI.c`, all 16
+first-party wrapper implementations, and `4DPlugin.cpp`, with ASan/UBSan and a
+synthetic engine-boundary callback. It never invokes Xcode project phases,
+signing, notarization, packaging, releases, or real display/window APIs.
+Temporary builds and the immutable `git archive` baseline are cleaned on exit.
+
+The audit baseline is `b01450430591ec8f158d24557fe148b23eee1682`.
+The bundled SDK implementation is git blob
+`29788ed041effaf67269ccd93f971e8aee2ce5f8`, SHA-256
+`2721c3d4338cc2a350599ffcee2a8008abaa756acfd45dd710720c64ca8c8ce3`;
+its only path-history commit is `efd310c12d7b393f893344f2041ac4253a936785`
+(`mv`). No external SDK dependency or upstream release pin is recorded.
+The implementation's `v14` and headers' `v13` comments are not verified upstream
+release identities. The regression verifies the SDK hash and preserves every
+baseline file except this README and the intentionally corrected first-party
+`Classes/C_PICTURE.cpp` and `Classes/ARRAY_TEXT.cpp`; new regression files
+are separate.
+
+### Inventory and contracts
+
+The full tracked native surface consists of `4DPlugin.cpp/.h`, the prefix
+header, `4DPluginAPI.c/.h/.def`, `EntryPoints.h`, `Flags.h`, `PrivateTypes.h`,
+`PublicTypes.h`, and the `.cpp/.h` pairs for `C_INTEGER`, `C_LONGINT`, `C_REAL`,
+`C_DATE`, `C_TIME`, `C_TEXT`, `C_BLOB`, `C_POINTER`, `C_PICTURE`,
+`ARRAY_BOOLEAN`, `ARRAY_DATE`, `ARRAY_INTEGER`, `ARRAY_LONGINT`, `ARRAY_REAL`,
+`ARRAY_TEXT`, and `ARRAY_TIME`. There are no additional tracked native sources
+or third-party libraries. The API header includes every wrapper header.
+`DPI.sln` selects `DPI.vcxproj`; that project, legacy `DPI.vc10.vcxproj`, and
+the Xcode Sources phase all compile the SDK, plugin, and all 16 wrappers.
+Their filter/project/header entries do not hide an alternate implementation.
+
+Both source and bundled manifests declare only `Get system DPI(&L):L`.
+The actual exported `FourDPackex` in the SDK captures the engine callback and
+calls `PluginMain`, which dispatches selector 1 to `Get_system_DPI`.
+Only `C_LONGINT` is used by this command. Text, picture, pointer, blob and array
+helpers are compiled but dormant from this dispatcher; the audit does not
+mistake the scalar manifest for evidence that they are safe.
+
+| Surface | Ownership conclusion |
+|---|---|
+| `ARRAY_TEXT` | Copies borrowed UTF-16 descriptors into independent C++ strings on input; creates an independent SDK string for each output and does not dispose accepted transfers. Rejects a null-data output before creating any strings, matching the existing wrong-type rejection behavior. |
+| SDK array setter/getter | `PA_SetStringInArray` accepts only ArrayUnicode, non-null data, `0 <= index <= count`, and a non-null input descriptor. Accepted assignments dispose the old element and shallow-transfer the new descriptor; rejection retains caller ownership. Getter results are borrowed. |
+| `C_TEXT` | Copies borrowed input; outputs use the SDK content setter, not descriptor transfer. UTF-8 conversion and Objective-C copies release their own temporary owners. |
+| `CPicture::fromFileAtPath` | The path's shallow alias is cleared once through its argument. Its borrowed picture output is retained by `setPicture`, then the argument owner is cleared. |
+| Other `CPicture` helpers | Undefined destinations avoid overwriting initial empty owners. `setBytes` releases its temporary after retain. Borrowed synchronous inputs in size/thumbnail are detached before argument clear. Grayscale/copy/thumbnail returns remain owning handoffs for consumers to release. |
+| Charset conversion | The bundled SDK returns bytes used, not UTF-16 units. `createCopy` divides by `sizeof(PA_Unichar)` before constructing its UTF-16 string. Capacity is bytes; string lengths exclude the terminator. |
+| Other scalar/numeric-array wrappers | Primitive or independent C++ value copies; no text descriptor transfer or callback owners. |
+| `C_BLOB` / `C_POINTER` | Blob storage is independently copied. Pointer value/reference-metadata ownership is ambiguous and deferred, not changed speculatively. |
+| Callbacks and returns | No first-party method callback, JSON, object or collection API use exists here. The harness exercises independent synchronous method inputs and owning returns through the real SDK. Command handle failure returns a raw-kind-zero sentinel; method failure returns Undefined. The sentinel is not normalized or cleared as a string. |
+
+### Evidence and limits
+
+The same harness fails the immutable baseline on eight named cases: `path`
+(double disposal plus lost initial string/output picture owners), `bytes`
+(unreleased retained temporaries), `copy-units` (ASan heap-buffer-overflow),
+`copy-owners`, `gray`, `size`, and `thumbnail` (overwritten initial owners),
+and `array-rejection` (lost string owner after null-data setter rejection).
+The fixed sources pass all 48 scenarios with explicit zero string, handle and
+picture-reference balances. ASCII, BMP, supplementary surrogate pairs and empty
+text are asserted exactly, with both allocated and null empty representations.
+Array independence, borrowed copies surviving replacement/shrink/clear, all
+setter rejection predicates and initial array-handle allocation failure,
+scalar content setters, owning return survival,
+unchanged/replaced/error command outputs, and poisoned failed picture-metadata
+outputs are covered. Four unchanged baseline controls also pass.
+macOS LeakSanitizer is unavailable; explicit allocation/ref tracking complements
+ASan/UBSan rather than claiming an LSan run.
+
+This is synthetic macOS engine-boundary evidence, not execution in 4D or Windows,
+and does not certify the originating Windows Poppler crash. The macOS exported
+dispatcher is exercised safely and returns the existing `-1` sentinel. No Windows
+display API is called. SDK-only application-path/picture-metadata ownership,
+`C_POINTER::getVariable` metadata, and SDK resize-OOM count corruption remain
+deferred. Normal successful array operations do not certify resize-OOM handling.
+The engine callback models documented create/retain/clear/content-copy contracts;
+the actual proprietary host engine is not bundled.
+
 ---
 
 ## Requirements & platform notes

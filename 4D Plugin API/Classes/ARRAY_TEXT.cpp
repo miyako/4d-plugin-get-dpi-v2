@@ -49,14 +49,14 @@ void ARRAY_TEXT::toParamAtIndex(PackagePtr pParams, uint32_t index)
 			case eVK_Undefined:
 				PA_ClearVariable(&arr);				
 				arr = PA_CreateVariable(eVK_ArrayUnicode);
-				param->fType = arr.fType;
+				*param = arr;
 				break;				
 			
 			default:
 				break;
 		}
 		
-		if(arr.fType == eVK_ArrayUnicode)
+		if(arr.fType == eVK_ArrayUnicode && arr.uValue.fArray.fData)
 		{
 			
 			PA_ResizeArray(&arr, this->_CUTF16StringArray->empty() ? 0 : (uint32_t)(this->_CUTF16StringArray->size() - 1));
