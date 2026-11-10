@@ -98,7 +98,7 @@ mistake the scalar manifest for evidence that they are safe.
 
 | Surface | Ownership conclusion |
 |---|---|
-| `ARRAY_TEXT` | Copies borrowed UTF-16 descriptors into independent C++ strings on input; creates an independent SDK string for each output and does not dispose accepted transfers. Rejects a null-data output before creating any strings, matching the existing wrong-type rejection behavior. |
+| `ARRAY_TEXT` | Copies borrowed UTF-16 descriptors into independent C++ strings on input; creates an independent SDK string for each output and does not dispose accepted transfers. Throws `std::invalid_argument` for a supplied null-data text-array output before creating any strings; failed initial array creation throws `std::bad_alloc` before modifying the caller parameter. Existing wrong-type rejection is unchanged. |
 | SDK array setter/getter | `PA_SetStringInArray` accepts only ArrayUnicode, non-null data, `0 <= index <= count`, and a non-null input descriptor. Accepted assignments dispose the old element and shallow-transfer the new descriptor; rejection retains caller ownership. Getter results are borrowed. |
 | `C_TEXT` | Copies borrowed input; outputs use the SDK content setter, not descriptor transfer. UTF-8 conversion and Objective-C copies release their own temporary owners. |
 | `CPicture::fromFileAtPath` | The path's shallow alias is cleared once through its argument. Its borrowed picture output is retained by `setPicture`, then the argument owner is cleared. |
@@ -134,6 +134,17 @@ display API is called. SDK-only application-path/picture-metadata ownership,
 deferred. Normal successful array operations do not certify resize-OOM handling.
 The engine callback models documented create/retain/clear/content-copy contracts;
 the actual proprietary host engine is not bundled.
+
+The array failure tests assert the exact exception type and unchanged caller
+descriptor (including a deliberately poisoned union), not a success-shaped empty
+array. No owner is created or lost on these paths. There is no first-party
+logging/error helper to reuse; C++ exceptions already occur on wrapper
+`new`/vector allocation failures. The new explicit exceptions extend that channel
+to rejected output data. They are not mapped to a new 4D error code. In particular,
+the bundled SDK's failed initial `PA_NewHandle` error is overwritten by its own
+subsequent lock/unlock calls; the wrapper does not claim `PA_GetLastError` retains
+it. The pre-existing `PluginMain` catch-all is unchanged, and the DPI dispatcher
+does not call this dormant wrapper.
 
 ---
 

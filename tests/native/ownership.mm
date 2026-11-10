@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <new>
+#include <stdexcept>
 #include <string>
 
 static void require(bool condition, const char *message)
@@ -435,18 +437,27 @@ static void arrayRejectionCase()
     source.appendUTF16String(text.c_str(), static_cast<uint32_t>(text.size()));
     PA_Variable array = {};
     array.fType = eVK_ArrayUnicode;
+    PA_Variable original;
+    std::memcpy(&original, &array, sizeof array);
     BytePtr parameters[] = {reinterpret_cast<BytePtr>(&array)};
-    source.toParamAtIndex(parameters, 1);
-    require(array.fType == eVK_ArrayUnicode && array.uValue.fArray.fData == nullptr,
+    bool rejected = false;
+    try { source.toParamAtIndex(parameters, 1); }
+    catch (const std::invalid_argument &) { rejected = true; }
+    require(std::memcmp(&array, &original, sizeof array) == 0,
             "null-data rejection preserves destination without creating owners");
     balance();
+    require(rejected, "explicit null-data rejection exception");
     array = PA_CreateVariable(eVK_Undefined);
     std::memset(&array.uValue, 0xA5, sizeof array.uValue);
+    std::memcpy(&original, &array, sizeof array);
     failHandle = true;
-    source.toParamAtIndex(parameters, 1);
+    rejected = false;
+    try { source.toParamAtIndex(parameters, 1); }
+    catch (const std::bad_alloc &) { rejected = true; }
     failHandle = false;
-    require(array.fType == eVK_ArrayUnicode && array.uValue.fArray.fData == nullptr,
-            "initial allocation failure publishes the null destination descriptor, not stale union data");
+    require(rejected, "explicit initial allocation failure exception");
+    require(std::memcmp(&array, &original, sizeof array) == 0,
+            "initial allocation failure preserves every byte of the caller parameter");
     balance();
 }
 
