@@ -1,0 +1,23 @@
+name: Native ownership
+
+on:
+  pull_request:
+    paths:
+      - '4DPlugin*'
+      - '4D Plugin API/**'
+      - '4D Plugin_Prefix.pch'
+      - 'tests/native/**'
+      - '.github/workflows/native-ownership.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ownership:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Unsigned direct native regressions and immutable baseline
+        run: python3 tests/native/run.py --baseline

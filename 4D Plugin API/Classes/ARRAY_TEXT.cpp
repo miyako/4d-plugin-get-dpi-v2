@@ -7,6 +7,8 @@
  */
 
 #include "ARRAY_TEXT.h"
+#include <new>
+#include <stdexcept>
 
 void ARRAY_TEXT::fromParamAtIndex(PackagePtr pParams, uint32_t index)
 {	
@@ -49,6 +51,8 @@ void ARRAY_TEXT::toParamAtIndex(PackagePtr pParams, uint32_t index)
 			case eVK_Undefined:
 				PA_ClearVariable(&arr);				
 				arr = PA_CreateVariable(eVK_ArrayUnicode);
+				if(!arr.uValue.fArray.fData)
+					throw std::bad_alloc();
 				param->fType = arr.fType;
 				break;				
 			
@@ -58,6 +62,8 @@ void ARRAY_TEXT::toParamAtIndex(PackagePtr pParams, uint32_t index)
 		
 		if(arr.fType == eVK_ArrayUnicode)
 		{
+			if(!arr.uValue.fArray.fData)
+				throw std::invalid_argument("ARRAY_TEXT output has no data");
 			
 			PA_ResizeArray(&arr, this->_CUTF16StringArray->empty() ? 0 : (uint32_t)(this->_CUTF16StringArray->size() - 1));
 			
